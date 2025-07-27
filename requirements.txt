@@ -1,0 +1,7 @@
+openai>=1.0.0
+markdown2
+weasyprint
+requests
+
+
+pip install openai markdown2 weasyprint pillow pytesseract imagehash opencv-python

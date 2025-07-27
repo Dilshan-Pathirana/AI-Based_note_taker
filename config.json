@@ -1,0 +1,7 @@
+{
+  "image_folder": "images",
+  "output_folder": "output",
+  "output_pdf": "final_notes.pdf",
+  "use_ai": true,
+  "model": "mistralai/mistral-7b-instruct"
+}
