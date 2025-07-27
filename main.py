@@ -1,7 +1,16 @@
 import os
+from openai import OpenAI
+from dotenv import load_dotenv
 from image_utils import extract_text_preserve_all
 from refiner import refine_notes_with_ai
 from pdf_generator import generate_pdf_from_markdown
+
+load_dotenv() 
+
+client = OpenAI(
+    base_url=os.getenv("OPENAI_BASE_URL"),
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 def scan_images(folder_path):
     """

@@ -1,25 +1,38 @@
-from openai import OpenAI
+import os
 import re
 import tiktoken
+from dotenv import load_dotenv
+from openai import OpenAI
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Ensure the required environment variables are set
+base_url = os.getenv("OPENAI_BASE_URL")
+api_key = os.getenv("OPENAI_API_KEY")
+if not base_url or not api_key:
+    raise EnvironmentError("Missing OPENAI_BASE_URL or OPENAI_API_KEY in .env")
+
+# Initialize OpenAI client
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key="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"
+    base_url=base_url,
+    api_key=api_key
 )
 
 def clean_ai_output(text: str) -> str:
-    # Keep cleaning minimal to preserve full structure
-    text = re.sub(r'\*{2,}|~{2,}', '', text)  # strip redundant asterisks/tilde
+    """Clean unnecessary formatting artifacts from AI response"""
+    text = re.sub(r'\*{2,}|~{2,}', '', text)  # remove excessive ** or ~~
     text = re.sub(r'-{3,}|_{3,}', '', text)   # remove decorative dividers
     text = re.sub(r'^(Here are the notes:|Summary:|Let me help you.*?)\n+', '', text, flags=re.IGNORECASE)
     return text.strip()
 
 def estimate_token_count(text: str) -> int:
-    # Use tiktoken to estimate token count based on the model
-    enc = tiktoken.encoding_for_model("gpt-3.5-turbo")  # close enough for Mistral
+    """Estimate token count using tiktoken encoding"""
+    enc = tiktoken.encoding_for_model("gpt-3.5-turbo")  # good approximation for Mistral
     return len(enc.encode(text))
 
-def split_into_chunks(text: str, max_tokens=1800) -> list:
+def split_into_chunks(text: str, max_tokens: int = 1800) -> list[str]:
+    """Split text into token-safe chunks"""
     paragraphs = text.split("\n\n")
     chunks = []
     current_chunk = []
@@ -40,6 +53,7 @@ def split_into_chunks(text: str, max_tokens=1800) -> list:
     return chunks
 
 def refine_notes_with_ai(text: str) -> str:
+    """Format notes using OpenAI with strict Markdown rules (no content changes)"""
     prompt_system = (
         "You are a Markdown note formatter. Your task is to FORMAT the given educational note content strictly without altering or summarizing any content.\n\n"
         "✳️ DO NOT:\n"
@@ -61,17 +75,21 @@ def refine_notes_with_ai(text: str) -> str:
 
     for i, chunk in enumerate(chunks):
         print(f"[AI] Processing chunk {i+1}/{len(chunks)}...")
-        response = client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct",
-            messages=[
-                {"role": "system", "content": prompt_system},
-                {"role": "user", "content": chunk}
-            ],
-            temperature=0.0,
-            max_tokens=2048,
-        )
-        ai_output = response.choices[0].message.content
-        cleaned = clean_ai_output(ai_output)
-        formatted_chunks.append(cleaned)
+        try:
+            response = client.chat.completions.create(
+                model="mistralai/mistral-7b-instruct",
+                messages=[
+                    {"role": "system", "content": prompt_system},
+                    {"role": "user", "content": chunk}
+                ],
+                temperature=0.0,
+                max_tokens=2048,
+            )
+            ai_output = response.choices[0].message.content
+            cleaned = clean_ai_output(ai_output)
+            formatted_chunks.append(cleaned)
+        except Exception as e:
+            print(f"[ERROR] Failed to process chunk {i+1}: {e}")
+            continue
 
     return "\n\n".join(formatted_chunks)
